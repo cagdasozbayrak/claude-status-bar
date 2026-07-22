@@ -3,6 +3,16 @@
 All notable changes to Claude Status Bar are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] - 2026-07-23
+
+### Added
+- **Notification sound.** A new "Notify when Claude needs you" toggle under Options (on by default) plays a system sound the moment a session enters the existing "Awaiting permission" state — the same signal that already drives the amber dot. It fires once on that transition, not repeatedly while the session keeps waiting. A "Test Sound" item previews it. (Complements upstream's turn-length-gated Completion Sound below — this one's about permission, not turn length.)
+- `AskUserQuestion` now maps to its own label ("Asking a question") instead of falling through to the generic "Using tool".
+
+### Fixed
+- **A long-running tool call could get falsely marked idle.** `PreToolUse`/`PostToolUse` only fire at the start and end of a tool call, so a Bash command that runs longer than 15 minutes (a build, test suite, deploy, ...) produced no hook activity in between and was silently flipped to idle by the orphaned-session recovery timeout, even though it was still genuinely running. The "tool" state now gets the same 2-hour leash as "permission"; only "thinking" (pure model generation, which should never legitimately hang with no tool call) keeps the tighter 15-minute one.
+- **`build.sh` hardcoded the bundle version**, so every local build stamped the same `CFBundleShortVersionString` regardless of actual source changes. Since the app only re-runs its hook installer when that version differs from what's recorded in `UserDefaults`, a build whose installer failed (or ran before hooks were fully wired) could never retry on a later rebuild — it looked "already installed" forever, silently leaving the real hooks missing from `settings.json`. `build.sh` now reads the version from `.claude-plugin/plugin.json` so it actually changes across real edits. (Upstream independently fixed the same symptom in 0.4.1 below by bumping the hardcoded string by hand; this fork's version is derived automatically so it can't drift again.)
+
 ## [0.4.1] - 2026-07-22
 
 ### Fixed

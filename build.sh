@@ -13,6 +13,17 @@ BIN="$APP/Contents/MacOS/ClaudeStatusBar"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 
+# Read the version from the plugin manifest instead of hardcoding it here. The app only re-runs
+# its hook installer when CFBundleShortVersionString changes from what's stored in UserDefaults
+# (see ensureHooksInstalled() in main.swift) -- a value that never changes across rebuilds makes
+# that self-heal check permanently a no-op, silently leaving stale/missing hooks in place.
+VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' .claude-plugin/plugin.json | head -1)"
+if [[ -z "$VERSION" ]]; then
+  echo "Could not read version from .claude-plugin/plugin.json" >&2
+  exit 1
+fi
+echo "Version: $VERSION"
+
 echo "Compiling universal binary (arm64 + x86_64)…"
 # Universal binary so it runs natively on both Apple Silicon and Intel (each Mac uses its own
 # slice, so Rosetta is never involved). swiftc emits one arch per -target, so this is two
@@ -23,7 +34,7 @@ swiftc -O -target x86_64-apple-macos12.0 Sources/*.swift -o "$BIN.x86_64" -frame
 lipo -create "$BIN.arm64" "$BIN.x86_64" -output "$BIN"
 rm -f "$BIN.arm64" "$BIN.x86_64"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -32,8 +43,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleDisplayName</key><string>Claude Status Bar</string>
   <key>CFBundleIdentifier</key><string>com.local.claudestatusbar</string>
   <key>CFBundleExecutable</key><string>ClaudeStatusBar</string>
-  <key>CFBundleVersion</key><string>0.4.1</string>
-  <key>CFBundleShortVersionString</key><string>0.4.1</string>
+  <key>CFBundleVersion</key><string>${VERSION}</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSUIElement</key><true/>

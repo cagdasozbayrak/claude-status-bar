@@ -378,6 +378,10 @@ final class StatusController: NSObject, NSMenuDelegate {
     var showTimer = false
     var iconSystem = false // false = brand Orange; true = adaptive black/white (template image)
     var useThinkingWords = true     // rotate a playful verb ("Manifesting…") in place of "Thinking…"
+    // Sound alert the moment a session stops working and needs you: awaiting permission, a turn
+    // finishing ("done"), or blocked on an AskUserQuestion prompt. On by default.
+    var notifySound = true
+    var notifySoundName: String { UserDefaults.standard.string(forKey: "notifySoundName") ?? "Glass" }
     var sessionWord: [String: String] = [:] // id -> current thinking word; re-picked on each entry into "thinking"
     var soundThreshold: Double = 0  // 0 = off; else the min turn length (seconds) that chimes on completion
     var turnStart: [String: Double] = [:]  // id -> active turn start, for the completion-sound length gate
@@ -447,6 +451,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         if d.object(forKey: "showTimer") != nil { showTimer = d.bool(forKey: "showTimer") }
         if d.object(forKey: "iconSystem") != nil { iconSystem = d.bool(forKey: "iconSystem") }
         if d.object(forKey: "thinkingWords") != nil { useThinkingWords = d.bool(forKey: "thinkingWords") }
+        if d.object(forKey: "notifySound") != nil { notifySound = d.bool(forKey: "notifySound") }
         if d.object(forKey: "soundThreshold") != nil { soundThreshold = d.double(forKey: "soundThreshold") }
         if let s = d.string(forKey: "animStyle"), let st = AnimStyle(rawValue: s) { animStyle = st }
         let menu = NSMenu()
@@ -684,6 +689,13 @@ final class StatusController: NSObject, NSMenuDelegate {
             UserDefaults.standard.set(on, forKey: "thinkingWords")
             self?.evaluate()   // re-render the bar label immediately with/without the rotating word
         })
+        menu.addItem(toggleRow(title: "Notify when Claude needs you", isOn: notifySound) { [weak self] on in
+            self?.notifySound = on
+            UserDefaults.standard.set(on, forKey: "notifySound")
+        })
+        let testSound = NSMenuItem(title: "Test Sound", action: #selector(playTestSound), keyEquivalent: "")
+        testSound.target = self
+        menu.addItem(testSound)
 
         let animParent = NSMenuItem(title: "Animation", action: nil, keyEquivalent: "")
         let animSub = NSMenu()
@@ -961,11 +973,25 @@ final class StatusController: NSObject, NSMenuDelegate {
         sessionWord[s.id] = w
     }
 
+    // Plays once on the transition into the state the app already renders as "needs you": the
+    // amber "Awaiting permission" dot (raw state == "permission", same signal sessionSymbol/render
+    // already use). Never repeats while it persists across ticks.
+    func maybeNotify(_ s: Session) {
+        guard notifySound else { return }
+        let was = (prevState[s.id] ?? "") == "permission"
+        let isNow = s.state == "permission"
+        if isNow && !was {
+            NSSound(named: notifySoundName)?.play()
+        }
+    }
+
     // "1m 1s" / "43s" — Claude Code's elapsed-clock style.
     func elapsed(_ secs: Int) -> String {
         let m = secs / 60, s = secs % 60
         return m > 0 ? "\(m)m \(s)s" : "\(s)s"
     }
+
+    @objc func playTestSound() { NSSound(named: notifySoundName)?.play() }
 
     // The marker keeps update.js's self-relaunch from undoing an explicit Quit; cleared on the
     // next SessionStart (lifecycle.js) or the next manual launch (below), whichever comes first.
@@ -1155,6 +1181,7 @@ final class StatusController: NSObject, NSMenuDelegate {
             }
             sessions[id] = s
             updateThinkingWord(s)
+            maybeNotify(s)
             if completionEdge(s, now: now) { chime = true }
             prevState[s.id] = s.state
         }
@@ -1206,7 +1233,12 @@ final class StatusController: NSObject, NSMenuDelegate {
     // collapses to rest.
     func effectiveState(_ s: Session, now: Double) -> String {
         if s.state == "thinking" || s.state == "tool" || s.state == "permission" {
-            let cap: Double = s.state == "permission" ? 7200 : 900
+            // "thinking"/"permission" get a hook event the moment they start and would only ever
+            // sit unchanged if orphaned (crash, silent Esc mid-turn) -> short-ish leash. "tool" only
+            // brackets a call with PreToolUse/PostToolUse and nothing in between, so a long-running
+            // command (build/test/deploy) can legitimately sit for a long time with zero heartbeat;
+            // give it the same generous cap as permission instead of falsely flipping to idle.
+            let cap: Double = s.state == "thinking" ? 900 : 7200
             if now - s.ts > cap { return "idle" }
             if !s.transcript.isEmpty, let last = lastTurnLine(ofFileAt: s.transcript),
                last.contains("interrupted by user") { return "idle" }

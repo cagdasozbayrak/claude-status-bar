@@ -18,7 +18,7 @@ const TOOL_LABELS = {
   Bash: "Running command", Edit: "Editing", Write: "Writing", MultiEdit: "Editing",
   NotebookEdit: "Editing", Read: "Reading", Grep: "Searching", Glob: "Searching",
   WebFetch: "Browsing web", WebSearch: "Searching web", Task: "Delegating",
-  TodoWrite: "Planning",
+  TodoWrite: "Planning", AskUserQuestion: "Asking a question",
 };
 
 const safeId = (s) => String(s || "").replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 64) || "unknown";

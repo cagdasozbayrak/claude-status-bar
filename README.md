@@ -1,6 +1,6 @@
 
 
-A tiny macOS menu bar app that shows **Claude Code's live status**: an animated Claude icon while it's thinking or running a tool, a yellow dot when it's awaiting your permission, and the elapsed time of the current turn. Lightweight, no window, no dock icon, no usage dashboards.
+A tiny macOS menu bar app that shows **Claude Code's live status**: an animated Claude icon while it's thinking or running a tool, a yellow dot when it's awaiting your permission, the elapsed time of the current turn, and an optional sound the moment it needs you. Lightweight, no window, no dock icon, no usage dashboards.
 
 Built so you can tab away during a long "thinking" stretch and still see, at a glance, whether Claude is working, waiting on you, or done.
 
@@ -47,6 +47,7 @@ Everything is controlled from the menu:
 
 - **Show timer:** toggle the elapsed `1m 1s` clock.
 - **Thinking words:** rotate a playful verb (`Manifesting…`, `Percolating…`) in place of `Thinking…`, like Claude Code (on by default).
+- **Notify when Claude needs you:** plays a system sound the moment a session enters the existing "Awaiting permission" state — the same signal behind the amber dot. Fires once on that transition, not repeatedly while it keeps waiting. On by default; a **Test Sound** item previews it.
 - **Animation style:**
   - **Claude Spark**, the web/chat "morph" spark
   - **Claude Code**, the terminal glyph spinner
@@ -70,7 +71,7 @@ Everything is controlled from the menu:
 > [!NOTE]
 > You don't open this app; it opens itself when a Claude Code session starts, and quits when none is running. The only manual launch is the very first one after install, to set up the hooks. Opened by hand with no session active, it quits again after a few seconds. That's normal.
 
-The app is stateless. Claude Code fires hooks as it works; the app polls those updates and aggregates them across every live session into a single icon, a permission dot if one needs you, animating if any session is working, resting when all are idle. It launches itself when Claude Code opens and quits when nothing's running, so there's nothing to manage.
+The app is stateless. Claude Code fires hooks as it works; the app polls those updates and aggregates them across every live session into a single icon, a permission dot if one needs you, animating if any session is working, resting when all are idle. A session flipping into "Awaiting permission" also triggers the notification sound, if enabled. It launches itself when Claude Code opens and quits when nothing's running, so there's nothing to manage.
 
 The installer merges its hooks into `~/.claude/settings.json` (backing it up first), and the app's only network activity is a once-a-day update check against GitHub's and Homebrew's public APIs ([details](PRIVACY.md)).
 
